@@ -2,30 +2,29 @@ extern crate core;
 
 use std::fmt::Formatter;
 use std::str::FromStr;
+
 use itertools::Itertools;
 
 #[derive(Clone, Debug)]
 enum NodeKind {
-    ROOT,
+    Root,
     S,
     K,
     I,
-    IDENT(String),
+    Ident(String),
 }
 
 impl std::fmt::Display for NodeKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use NodeKind::*;
         match self {
-            ROOT => {
+            Root => {
                 write!(f, "#")
             }
-            IDENT(s) => {
+            Ident(s) => {
                 write!(f, "\"{}\"", s)
             }
-            _ => {
-                std::fmt::Debug::fmt(self, f)
-            }
+            _ => std::fmt::Debug::fmt(self, f),
         }
     }
 }
@@ -43,13 +42,12 @@ impl Node {
             match it.kind {
                 NodeKind::S => {
                     let x = self.children.pop().unwrap();
-                    let y = self.children.pop().unwrap();
+                    let mut y = self.children.pop().unwrap();
                     let z = self.children.pop().unwrap();
-                    let mut yz = y.clone();
-                    yz.children.reverse();
-                    yz.children.push(z.clone());
-                    yz.children.reverse();
-                    self.children.push(yz);
+                    y.children.reverse();
+                    y.children.push(z.clone());
+                    y.children.reverse();
+                    self.children.push(y);
                     self.children.push(z);
                     self.children.push(x);
                 }
@@ -59,8 +57,8 @@ impl Node {
                     self.children.push(x);
                 }
                 NodeKind::I => {}
-                NodeKind::ROOT => {}
-                NodeKind::IDENT(_) => {
+                NodeKind::Root => {}
+                NodeKind::Ident(_) => {
                     self.apply();
                     self.children.push(it);
                 }
@@ -70,7 +68,10 @@ impl Node {
     }
     pub fn normalize(&mut self) {
         if let Some(it) = self.children.pop() {
-            let new_last = Node { kind: it.kind, children: vec![] };
+            let new_last = Node {
+                kind: it.kind,
+                children: vec![],
+            };
             it.children.into_iter().for_each(|n| self.children.push(n));
             self.children.push(new_last);
         }
@@ -96,28 +97,26 @@ impl Node {
     }
     pub fn new(ident: String, children: Vec<Node>) -> Self {
         Node {
-            kind: NodeKind::IDENT(ident),
+            kind: NodeKind::Ident(ident),
             children,
         }
     }
     fn parse_slice_chars(chars: &[char], i: &mut usize) -> Result<Self, ()> {
         let mut nodes = vec![];
         while *i < chars.len() {
-            nodes.push(
-                match chars[*i] {
-                    'S' => Node::s(vec![]),
-                    'K' => Node::k(vec![]),
-                    'I' => Node::i(vec![]),
-                    '(' => {
-                        *i += 1;
-                        Self::parse_slice_chars(&chars, i)?
-                    }
-                    ')' => {
-                        break;
-                    }
-                    c => Node::new(String::from(c), vec![]),
+            nodes.push(match chars[*i] {
+                'S' => Node::s(vec![]),
+                'K' => Node::k(vec![]),
+                'I' => Node::i(vec![]),
+                '(' => {
+                    *i += 1;
+                    Self::parse_slice_chars(chars, i)?
                 }
-            );
+                ')' => {
+                    break;
+                }
+                c => Node::new(String::from(c), vec![]),
+            });
             *i += 1;
         }
         nodes.reverse();
@@ -135,7 +134,16 @@ impl std::fmt::Display for Node {
         if self.children.is_empty() {
             write!(f, "{}", self.kind)
         } else {
-            write!(f, "({}{})", self.kind, self.children.iter().rev().map(|n| format!("{}", n)).join(""))
+            write!(
+                f,
+                "({}{})",
+                self.kind,
+                self.children
+                    .iter()
+                    .rev()
+                    .map(|n| format!("{}", n))
+                    .join("")
+            )
         }
     }
 }
@@ -144,9 +152,9 @@ impl FromStr for Node {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut children = Self::parse_slice_chars(&s.chars().collect_vec(), &mut 0)?;
+        let children = Self::parse_slice_chars(&s.chars().collect_vec(), &mut 0)?;
         let mut node = Node {
-            kind: NodeKind::ROOT,
+            kind: NodeKind::Root,
             children: vec![children],
         };
         node.normalize();
@@ -157,19 +165,23 @@ impl FromStr for Node {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+
     use crate::Node;
     use crate::NodeKind::*;
 
     #[test]
     fn it_works() {
         let mut root = Node {
-            kind: ROOT,
+            kind: Root,
             children: vec![
                 Node::s(vec![]),
                 Node::i(vec![]),
                 Node::i(vec![]),
                 Node::new(String::from("a"), vec![]),
-            ].into_iter().rev().collect(),
+            ]
+            .into_iter()
+            .rev()
+            .collect(),
         };
         for _ in 0..5 {
             println!("{}", root);
